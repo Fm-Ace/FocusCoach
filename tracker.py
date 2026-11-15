@@ -59,6 +59,7 @@ def clean_title(title: str) -> str:
 def get_idle_seconds() -> float:
     last_input = win32api.GetLastInputInfo()
     current_tick = win32api.GetTickCount()
+    # Windows uses a 32-bit counter, so this keeps the result correct when it wraps around.
     return ((current_tick - last_input) & 0xFFFFFFFF) / 1000
 
 
@@ -71,6 +72,7 @@ def get_process_name(process_id: int) -> str:
 
 def get_real_uwp_process(window: int, host_process_id: int) -> int:
     """Find the app inside Windows' shared Store-app host process."""
+    # Store apps can appear as ApplicationFrameHost, so look for the real child process.
     child_processes = []
 
     def collect(child_window, _):
@@ -104,6 +106,7 @@ def get_active_window() -> tuple[str, str] | None:
 
 def get_browser_title(process_name: str, title: str) -> tuple[str, str]:
     """Use the page title Windows already puts in the browser's title bar."""
+    # The browser name is just a suffix; remove it to keep the actual page title.
     browser = BROWSERS.get(process_name.casefold())
     if not browser:
         return title, ""
@@ -116,6 +119,8 @@ def get_browser_title(process_name: str, title: str) -> tuple[str, str]:
 
 class MediaPlaybackMonitor:
     """Keep track of apps Windows currently reports as playing media."""
+
+    # Media sessions use an async Windows API, so check them on a separate thread.
 
     def __init__(self, check_every: float = 1.0):
         self.check_every = check_every
@@ -137,8 +142,10 @@ class MediaPlaybackMonitor:
 
     def is_playing_for(self, process_name: str) -> bool:
         app = process_name.casefold()
+        # Windows reports app IDs, which don't always match the .exe file name.
         aliases = MEDIA_ALIASES.get(app, (app.removesuffix(".exe"),))
 
+        # The media thread updates this set while the tracker reads it.
         with self._lock:
             return any(
                 alias in source
@@ -170,6 +177,7 @@ class MediaPlaybackMonitor:
             playing_apps = set()
 
             try:
+                # Only a session Windows marks as PLAYING should prevent idle time.
                 for session in manager.get_sessions() or []:
                     playback = session.get_playback_info()
                     if playback and playback.playback_status == playing_status:
@@ -192,6 +200,7 @@ def get_current_activity(media: MediaPlaybackMonitor | None = None) -> Activity 
 
     process_name, window_title = window
     media_is_playing = media is not None and media.is_playing_for(process_name)
+    # Watching media counts as activity, but only if the app is actually playing it.
     idle = get_idle_seconds() >= IDLE_AFTER and not media_is_playing
 
     if process_name.casefold() in BROWSERS:

@@ -107,8 +107,6 @@ class ActivityLog:
             self.db.close()
             raise
 
-    # ----------------------------------------------------------------- public
-
     def record(self, activity: Activity | None, now: float | None = None):
         """Tell the log what the user is doing right now.
 
@@ -147,8 +145,6 @@ class ActivityLog:
         """Close the open row and the database."""
         self._close_row(at=time.time())
         self.db.close()
-
-    # ---------------------------------------------------------------- private
 
     def _prepare_database(self) -> None:
         with self.db:

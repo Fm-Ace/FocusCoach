@@ -22,6 +22,7 @@ logger = logging.getLogger("focuscoach")
 
 
 def setup_logging() -> None:
+    """Show important warnings and keep a small log file for troubleshooting."""
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
@@ -30,6 +31,7 @@ def setup_logging() -> None:
     console.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
     root.addHandler(console)
 
+    # Keep the log small instead of letting it grow forever.
     file = RotatingFileHandler(
         LOG_PATH,
         maxBytes=1_000_000,
@@ -42,19 +44,24 @@ def setup_logging() -> None:
     root.addHandler(file)
 
 
-def stop_on_signal(signum, frame) -> None:
+def stop_on_signal(_signum, _frame) -> None:
+    """Use the normal cleanup path when Windows asks the program to stop."""
     raise KeyboardInterrupt
 
 
 def read_activity(media: MediaPlaybackMonitor) -> Activity | None:
+    """Read the current activity without letting a Windows hiccup stop tracking."""
     try:
         return get_current_activity(media)
-    except Exception:
+    # Windows can briefly refuse access while windows or processes are changing.
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Could not read the active window")
         return None
 
 
 def main() -> int:
+    """Start FocusCoach and keep recording until the user stops it."""
+    # Some Windows terminals use an encoding that cannot print every page title.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
@@ -79,6 +86,7 @@ def main() -> int:
     media = MediaPlaybackMonitor()
 
     try:
+        # Keep media checks separate so they never slow down activity tracking.
         media.start()
         print("FocusCoach is running.")
         print(f"A change is saved after {SETTLE_SECONDS} seconds.")
@@ -87,6 +95,7 @@ def main() -> int:
         print("Press Ctrl+C to stop.\n")
 
         while True:
+            # Check twice per second; ActivityLog filters out very short app switches.
             started = log.record(read_activity(media))
             if started:
                 print(started)
@@ -96,6 +105,7 @@ def main() -> int:
         print("\nFocusCoach stopped.")
 
     finally:
+        # Close the database and stop the background thread, even after an error.
         log.close()
         media.stop()
 
