@@ -34,6 +34,22 @@ class TrackerTests(unittest.TestCase):
                 setup_logging.assert_not_called()
                 stderr.write.assert_any_call("Could not check whether another copy of FocusCoach is running.")
 
+    def test_second_launch_signals_existing_instance_to_stop(self):
+        event = object()
+        self.tracker.STOP_EVENT_NAME = "FocusCoach_Test_Stop"
+
+        with (
+            patch.object(self.modules["win32event"], "CreateEvent", return_value=event, create=True) as create_event,
+            patch.object(self.modules["win32event"], "CreateMutex", return_value=object(), create=True),
+            patch.object(self.modules["win32event"], "SetEvent", create=True) as set_event,
+            patch.object(self.modules["win32api"], "GetLastError", return_value=183, create=True),
+            patch.object(self.modules["winerror"], "ERROR_ALREADY_EXISTS", 183, create=True),
+        ):
+            self.assertTrue(self.tracker.another_copy_is_running())
+
+        create_event.assert_called_once_with(None, True, False, "FocusCoach_Test_Stop")
+        set_event.assert_called_once_with(event)
+
     def test_playback_uses_exact_ids_and_expires_after_failed_reads(self):
         monitor = self.tracker.MediaPlaybackMonitor()
         manager = Mock()
@@ -44,6 +60,7 @@ class TrackerTests(unittest.TestCase):
             types.SimpleNamespace(source_app_user_model_id=app_id, get_playback_info=lambda: playback)
             for app_id in ("CHROME.EXE", "Microsoft Edge")
         ]
+
         def get_sessions():
             if clock.return_value == 10.0:
                 return playing
@@ -69,3 +86,7 @@ class TrackerTests(unittest.TestCase):
         ):
             asyncio.run(monitor._watch())
         self.assertEqual(results, [(True, True, False), (False, False, False)])
+
+
+if __name__ == "__main__":
+    unittest.main()
