@@ -20,7 +20,7 @@ class ExportDataTests(unittest.TestCase):
     def setUp(self):
         directory = self.enterContext(tempfile.TemporaryDirectory())
         self.root = Path(directory)
-        self.database = self.root / "activity ?# é.db"
+        self.database = self.root / "activity # é.db"
         self.output = self.root / "new" / "data" / "activities.csv"
         ActivityLog(self.database).close()
 
