@@ -23,7 +23,7 @@ To keep supported foreground apps marked active while Windows reports they are p
 .\.venv\Scripts\python.exe focuscoach.py
 ```
 
-Press Ctrl+C to stop. FocusCoach saves its activity history in `focuscoach.db` and writes troubleshooting messages to `focuscoach.log` next to the script. The database may contain sensitive window titles; keep it private.
+Click the VS Code Run Code button again to request a graceful stop. When running directly from PowerShell, press Ctrl+C instead. FocusCoach saves its activity history in `focuscoach.db` and writes troubleshooting messages to `focuscoach.log` next to the script. The database may contain sensitive window titles; keep it private.
 
 ## Test
 
@@ -31,5 +31,4 @@ Press Ctrl+C to stop. FocusCoach saves its activity history in `focuscoach.db` a
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The Windows smoke tests check the mutex across processes and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in the terminal. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
-
+The Windows smoke tests check that a second process can request a graceful stop and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in the terminal. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
