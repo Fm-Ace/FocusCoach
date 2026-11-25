@@ -17,6 +17,7 @@ env/
 *.db-shm
 *.log
 *.log.*
+ml/data/
 
 # Secrets and local environment variables
 .env
