@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # A change must last this long before it is logged, so quick glances at
 # another window don't create rows.
-SETTLE_SECONDS = 3
+SETTLE_SECONDS = 2
 
 # If record() isn't called for this long, the computer slept or the program
 # froze. We can't know what happened in between, so the open row is closed.
