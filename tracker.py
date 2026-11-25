@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 IDLE_AFTER = 120
 MUTEX_NAME = "FocusCoach_SingleInstance"
+STOP_EVENT_NAME = "FocusCoach_Stop"
 MAX_TITLE_LENGTH = 300
 PROTECTED_APP = "Protected app"
 UWP_HOST = "applicationframehost.exe"
@@ -39,17 +40,48 @@ MEDIA_ALIASES = {
 }
 
 _instance_mutex = None
+_stop_event = None
 
 
 def another_copy_is_running() -> bool:
-    """Keep one tracker connected to the database at a time."""
-    global _instance_mutex
+    """Create the shared stop signal; a second launch asks the first to stop."""
+    global _instance_mutex, _stop_event
 
     try:
         _instance_mutex = win32event.CreateMutex(None, False, MUTEX_NAME)
-        return win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS
+        already_running = win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS
+        _stop_event = win32event.CreateEvent(None, True, False, STOP_EVENT_NAME)
+
+        if already_running:
+            win32event.SetEvent(_stop_event)
+
+        return already_running
     except pywintypes.error:
+        close_instance_handles()
         raise RuntimeError("Could not check whether another copy of FocusCoach is running.") from None
+
+
+def stop_requested() -> bool:
+    """Return whether another launch has requested a graceful shutdown."""
+    if _stop_event is None:
+        return False
+
+    return win32event.WaitForSingleObject(_stop_event, 0) == win32event.WAIT_OBJECT_0
+
+
+def close_instance_handles() -> None:
+    """Release the named Windows handles when this process is exiting."""
+    global _instance_mutex, _stop_event
+
+    for handle in (_stop_event, _instance_mutex):
+        if handle is not None:
+            try:
+                handle.Close()
+            except (AttributeError, pywintypes.error):
+                pass
+
+    _stop_event = None
+    _instance_mutex = None
 
 
 def clean_title(title: str) -> str:
