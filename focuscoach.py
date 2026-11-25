@@ -85,6 +85,7 @@ def main() -> int:
 
     setup_logging()
     print("Starting FocusCoach...")
+    logger.info("Starting FocusCoach.")
 
     for name in ("SIGTERM", "SIGBREAK"):
         if hasattr(signal, name):
@@ -94,6 +95,7 @@ def main() -> int:
         log = ActivityLog(DB_PATH)
     except sqlite3.Error as error:
         print(f"Could not open the database: {error}")
+        logger.exception("Could not open the activity database")
         close_instance_handles()
         return 1
 
@@ -107,18 +109,22 @@ def main() -> int:
         print("Playing media stays active while Windows reports it as playing.")
         print(f"Database: {DB_PATH}")
         print("Run FocusCoach again or press Ctrl+C to stop.\n")
+        logger.info("FocusCoach is running. Database: %s", DB_PATH)
 
         while not stop_requested():
             # Check twice per second; ActivityLog filters out very short app switches.
             started = log.record(read_activity(media))
             if started:
                 print(started)
+                logger.info("%s", started)
             time.sleep(CHECK_INTERVAL)
 
         print("\nFocusCoach stopped.")
+        logger.info("FocusCoach stopped.")
 
     except KeyboardInterrupt:
         print("\nFocusCoach stopped.")
+        logger.info("FocusCoach stopped.")
 
     finally:
         # Close the database, background thread, and named Windows handles.
