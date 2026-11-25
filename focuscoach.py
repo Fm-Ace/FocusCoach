@@ -66,12 +66,17 @@ def main() -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
-    setup_logging()
-    print("Starting FocusCoach...")
-
-    if another_copy_is_running():
+    try:
+        already_running = another_copy_is_running()
+    except RuntimeError as error:
+        print(error, file=sys.stderr)
+        return 1
+    if already_running:
         print("FocusCoach is already running. Close the other copy first.")
         return 1
+
+    setup_logging()
+    print("Starting FocusCoach...")
 
     for name in ("SIGTERM", "SIGBREAK"):
         if hasattr(signal, name):
