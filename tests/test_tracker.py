@@ -17,6 +17,9 @@ class TrackerTests(unittest.TestCase):
             cls.tracker = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.tracker)
 
+    def tearDown(self):
+        self.tracker.close_instance_handles()
+
     def test_mutex_error_prevents_database_startup(self):
         with patch.object(self.modules["win32event"], "CreateMutex", side_effect=OSError, create=True):
             with patch.dict(sys.modules, {"tracker": self.tracker}):
@@ -49,6 +52,18 @@ class TrackerTests(unittest.TestCase):
 
         create_event.assert_called_once_with(None, True, False, "FocusCoach_Test_Stop")
         set_event.assert_called_once_with(event)
+
+    def test_stop_requested_checks_the_shared_event(self):
+        event = object()
+        self.tracker._stop_event = event
+
+        with (
+            patch.object(self.modules["win32event"], "WAIT_OBJECT_0", 0, create=True),
+            patch.object(self.modules["win32event"], "WaitForSingleObject", return_value=0, create=True) as wait,
+        ):
+            self.assertTrue(self.tracker.stop_requested())
+
+        wait.assert_called_once_with(event, 0)
 
     def test_playback_uses_exact_ids_and_expires_after_failed_reads(self):
         monitor = self.tracker.MediaPlaybackMonitor()
