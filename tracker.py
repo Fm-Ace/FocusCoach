@@ -6,6 +6,7 @@ import asyncio
 import logging
 import re
 import threading
+import time
 
 import psutil
 import pywintypes
@@ -34,7 +35,7 @@ BROWSERS = {
 }
 
 MEDIA_ALIASES = {
-    "msedge.exe": ("edge",),
+    "msedge": ("edge", "microsoft edge"),
 }
 
 _instance_mutex = None
@@ -48,8 +49,7 @@ def another_copy_is_running() -> bool:
         _instance_mutex = win32event.CreateMutex(None, False, MUTEX_NAME)
         return win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS
     except pywintypes.error:
-        logger.warning("Could not check whether another copy is running.")
-        return False
+        raise RuntimeError("Could not check whether another copy of FocusCoach is running.") from None
 
 
 def clean_title(title: str) -> str:
@@ -125,6 +125,7 @@ class MediaPlaybackMonitor:
     def __init__(self, check_every: float = 1.0):
         self.check_every = check_every
         self._playing_apps: set[str] = set()
+        self._playing_until = 0.0
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread = threading.Thread(
@@ -141,16 +142,12 @@ class MediaPlaybackMonitor:
         self._thread.join(timeout=2)
 
     def is_playing_for(self, process_name: str) -> bool:
-        app = process_name.casefold()
-        # Windows reports app IDs, which don't always match the .exe file name.
-        aliases = MEDIA_ALIASES.get(app, (app.removesuffix(".exe"),))
+        app = process_name.casefold().removesuffix(".exe")
 
-        # The media thread updates this set while the tracker reads it.
         with self._lock:
-            return any(
-                alias in source
-                for alias in aliases
-                for source in self._playing_apps
+            return time.monotonic() < self._playing_until and (
+                app in self._playing_apps
+                or any(alias in self._playing_apps for alias in MEDIA_ALIASES.get(app, ()))
             )
 
     def _run(self) -> None:
@@ -158,7 +155,7 @@ class MediaPlaybackMonitor:
             asyncio.run(self._watch())
         except ImportError:
             logger.warning(
-                "Media detection is unavailable. Install the project requirements "
+                "Media detection is unavailable. Install requirements-media.txt "
                 "to keep playing videos from being marked idle."
             )
         except Exception:
@@ -181,12 +178,13 @@ class MediaPlaybackMonitor:
                 for session in manager.get_sessions() or []:
                     playback = session.get_playback_info()
                     if playback and playback.playback_status == playing_status:
-                        app_id = session.source_app_user_model_id.casefold()
+                        app_id = session.source_app_user_model_id.casefold().removesuffix(".exe")
                         if app_id:
                             playing_apps.add(app_id)
 
                 with self._lock:
                     self._playing_apps = playing_apps
+                    self._playing_until = time.monotonic() + 3 * self.check_every
             except Exception as error:
                 logger.debug("Could not read media sessions: %s", error)
 
