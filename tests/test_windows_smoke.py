@@ -8,7 +8,7 @@ from uuid import uuid4
 
 @unittest.skipUnless(sys.platform == "win32", "Requires Windows and the project dependencies")
 class WindowsSmokeTests(unittest.TestCase):
-    def test_second_process_requests_stop(self):
+    def test_second_process_uses_launcher_to_request_stop(self):
         import tracker
 
         mutex_name = f"FocusCoach_Test_{uuid4().hex}"
@@ -22,10 +22,9 @@ class WindowsSmokeTests(unittest.TestCase):
                 child = subprocess.run(
                     [
                         sys.executable, "-c",
-                        "import sys, tracker; tracker.MUTEX_NAME = sys.argv[1]; "
-                        "tracker.STOP_EVENT_NAME = sys.argv[2]; "
-                        "sys.exit(0 if tracker.another_copy_is_running() else 1)",
-                        mutex_name,
+                        "import sys, run_focuscoach; "
+                        "run_focuscoach.STOP_EVENT_NAME = sys.argv[1]; "
+                        "sys.exit(0 if run_focuscoach.request_stop() else 1)",
                         event_name,
                     ],
                     capture_output=True, text=True, timeout=10,
