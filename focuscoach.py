@@ -11,7 +11,13 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from activity_log import SETTLE_SECONDS, Activity, ActivityLog
-from tracker import MediaPlaybackMonitor, another_copy_is_running, get_current_activity
+from tracker import (
+    MediaPlaybackMonitor,
+    another_copy_is_running,
+    close_instance_handles,
+    get_current_activity,
+    stop_requested,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "focuscoach.db"
@@ -60,7 +66,7 @@ def read_activity(media: MediaPlaybackMonitor) -> Activity | None:
 
 
 def main() -> int:
-    """Start FocusCoach and keep recording until the user stops it."""
+    """Start FocusCoach; launching it again requests a graceful stop."""
     # Some Windows terminals use an encoding that cannot print every page title.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -71,12 +77,15 @@ def main() -> int:
     except RuntimeError as error:
         print(error, file=sys.stderr)
         return 1
+
     if already_running:
-        print("FocusCoach is already running. Close the other copy first.")
-        return 1
+        print("Stop requested. FocusCoach is shutting down.")
+        close_instance_handles()
+        return 0
 
     setup_logging()
     print("Starting FocusCoach...")
+    logger.info("Starting FocusCoach.")
 
     for name in ("SIGTERM", "SIGBREAK"):
         if hasattr(signal, name):
@@ -86,6 +95,8 @@ def main() -> int:
         log = ActivityLog(DB_PATH)
     except sqlite3.Error as error:
         print(f"Could not open the database: {error}")
+        logger.exception("Could not open the activity database")
+        close_instance_handles()
         return 1
 
     media = MediaPlaybackMonitor()
@@ -97,22 +108,29 @@ def main() -> int:
         print(f"A change is saved after {SETTLE_SECONDS} seconds.")
         print("Playing media stays active while Windows reports it as playing.")
         print(f"Database: {DB_PATH}")
-        print("Press Ctrl+C to stop.\n")
+        print("Run FocusCoach again or press Ctrl+C to stop.\n")
+        logger.info("FocusCoach is running. Database: %s", DB_PATH)
 
-        while True:
+        while not stop_requested():
             # Check twice per second; ActivityLog filters out very short app switches.
             started = log.record(read_activity(media))
             if started:
                 print(started)
+                logger.info("%s", started)
             time.sleep(CHECK_INTERVAL)
+
+        print("\nFocusCoach stopped.")
+        logger.info("FocusCoach stopped.")
 
     except KeyboardInterrupt:
         print("\nFocusCoach stopped.")
+        logger.info("FocusCoach stopped.")
 
     finally:
-        # Close the database and stop the background thread, even after an error.
+        # Close the database, background thread, and named Windows handles.
         log.close()
         media.stop()
+        close_instance_handles()
 
     return 0
 
