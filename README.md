@@ -1,0 +1,38 @@
+<!-- coderabbit-ai-generated:v1 -->
+
+# FocusCoach
+
+FocusCoach is a Windows desktop tracker that records the foreground app, window title, and idle status in a local SQLite database.
+
+## Setup
+
+On Windows 10 version 1809 or later, or Windows 11, with 64-bit Python 3.12 installed, run these commands in PowerShell from the repository:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+To keep supported foreground apps marked active while Windows reports they are playing media, also install the optional media bindings:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-media.txt
+```
+
+## Run
+
+```powershell
+.\.venv\Scripts\python.exe focuscoach.py
+```
+
+Press Ctrl+C to stop. FocusCoach saves its activity history in `focuscoach.db` and writes troubleshooting messages to `focuscoach.log` next to the script. The database may contain sensitive window titles; keep it private.
+
+## Test
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+The Windows smoke tests check the mutex across processes and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in the terminal. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
+
+On other platforms, `python -m unittest discover -s tests -v` runs the SQLite and mocked tracker tests without the Windows dependencies.

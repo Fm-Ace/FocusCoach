@@ -98,6 +98,7 @@ class ActivityLog:
         self.row_id: int | None = None  # Id of the open row, if any.
         self.pending: _Pending | None = None
         self.last_call: float | None = None
+        self._gap_end: float | None = None
         self.last_heartbeat = 0.0
         self._last_error = ("", 0.0)
 
@@ -107,7 +108,7 @@ class ActivityLog:
             self.db.close()
             raise
 
-    def record(self, activity: Activity | None, now: float | None = None):
+    def record(self, activity: Activity | None, now: float | None = None) -> Activity | None:
         """Tell the log what the user is doing right now.
 
         Returns the activity when a new row was just opened, otherwise None.
@@ -124,16 +125,18 @@ class ActivityLog:
 
         self._close_after_gap(now)
         self.last_call = now
-        self._heartbeat(now)
+        if self._gap_end is None:
+            self._heartbeat(now)
 
-        if same_activity(activity, self.logged):
+        logged = self.logged if self._gap_end is None else None
+        if same_activity(activity, logged):
             self.pending = None
             return None
 
         if self.pending is None or not same_activity(activity, self.pending.activity):
             self.pending = _Pending(activity, since=now)
 
-        if now - self.pending.since < SETTLE_SECONDS:
+        if self._gap_end is not None or now - self.pending.since < SETTLE_SECONDS:
             return None
 
         if self._switch_to(activity, at=self.pending.since):
@@ -143,7 +146,7 @@ class ActivityLog:
 
     def close(self) -> None:
         """Close the open row and the database."""
-        self._close_row(at=time.time())
+        self._close_row(at=self._gap_end if self._gap_end is not None else time.time())
         self.db.close()
 
     def _prepare_database(self) -> None:
@@ -191,18 +194,16 @@ class ActivityLog:
         self.db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def _close_after_gap(self, now: float) -> None:
-        if self.last_call is None:
-            return
+        if self.last_call is not None and not self.last_call <= now <= self.last_call + GAP_SECONDS:
+            self.pending = None
+            if self._gap_end is None:
+                self._gap_end = self.last_call
 
-        if self.last_call <= now <= self.last_call + GAP_SECONDS:
-            return
-
-        # Either we slept or froze (now is far later), or the clock was set
-        # backwards. Close the row where we last knew the user was there.
-        self._close_row(at=self.last_call)
-        self.logged = None
-        self.row_id = None
-        self.pending = None
+        # Preserve the first gap's end time until the write succeeds.
+        if self._gap_end is not None and self._close_row(at=self._gap_end):
+            self.logged = None
+            self.row_id = None
+            self._gap_end = None
 
     def _heartbeat(self, now: float) -> None:
         if self.row_id is None or now - self.last_heartbeat < HEARTBEAT_SECONDS:
@@ -257,17 +258,17 @@ class ActivityLog:
         self.last_heartbeat = at
         return True
 
-    def _close_row(self, at: float) -> None:
+    def _close_row(self, at: float) -> bool:
         if self.row_id is None:
-            return
+            return True
 
         try:
             with self.db:
                 self._end_row(self.row_id, at)
         except sqlite3.Error as error:
-            # The row stays open in the file. The next start closes it at
-            # its last heartbeat, so little is lost.
             self._report(error)
+            return False
+        return True
 
     def _end_row(self, row_id: int, at: float) -> None:
         # MAX() keeps the end from landing before the start if the clock moved.
