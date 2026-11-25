@@ -1,8 +1,6 @@
-<!-- coderabbit-ai-generated:v1 -->
-
 # FocusCoach
 
-FocusCoach is a Windows desktop tracker that records the foreground app, window title, and idle status in a local SQLite database.
+FocusCoach is a Windows desktop App designed to improve Focus and Workflow that records the foreground app, window title, and idle status in a local SQLite database, For ML to decide if its a distracting activity, its neutral or its not. This project is complex and is still in the works, but the Final project will be worth it!
 
 ## Setup
 
@@ -35,4 +33,3 @@ Press Ctrl+C to stop. FocusCoach saves its activity history in `focuscoach.db` a
 
 The Windows smoke tests check the mutex across processes and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in the terminal. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
 
-On other platforms, `python -m unittest discover -s tests -v` runs the SQLite and mocked tracker tests without the Windows dependencies.
