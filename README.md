@@ -19,11 +19,17 @@ To keep supported foreground apps marked active while Windows reports they are p
 
 ## Run
 
+Open `focuscoach.py` and click **Run Code**. Click **Run Code** again to request a graceful stop. The workspace config routes this file through `run_focuscoach.py`, a short-lived launcher, so Code Runner is ready for the next click while the tracker runs in the background.
+
+To use the same toggle directly from PowerShell:
+
 ```powershell
-.\.venv\Scripts\python.exe focuscoach.py
+.\.venv\Scripts\python.exe run_focuscoach.py
 ```
 
-Click the VS Code Run Code button again to request a graceful stop. When running directly from PowerShell, press Ctrl+C instead. FocusCoach saves its activity history in `focuscoach.db` and writes troubleshooting messages to `focuscoach.log` next to the script. The database may contain sensitive window titles; keep it private.
+Run that command again to stop FocusCoach. To run the tracker attached to the current terminal instead, use `focuscoach.py` directly and press Ctrl+C to stop it.
+
+FocusCoach saves its activity history in `focuscoach.db` and its activity and troubleshooting logs in `focuscoach.log` next to the script. The database may contain sensitive window titles; keep it private.
 
 ## Test
 
@@ -31,4 +37,4 @@ Click the VS Code Run Code button again to request a graceful stop. When running
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The Windows smoke tests check that a second process can request a graceful stop and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in the terminal. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
+The Windows smoke tests check that a second process can use the launcher to request a graceful stop and import the optional media bindings if installed. For an interactive check, start FocusCoach, switch between apps for at least three seconds each, and confirm the changes appear in `focuscoach.log`. With the media bindings installed, leave a supported browser playing in the foreground past the two minute idle threshold, then pause playback and confirm the window is marked idle after the threshold and settle period.
